@@ -1,6 +1,6 @@
-# Mobility Localness Index (MLI) Calculation Tool
+# Local Mobility Index (LMI) Calculation Tool
 
-This Python tool calculates a "Mobility Localness Index" (MLI) for given stop points, taking into account home and optional work locations. It is designed to assess the localness of mobility patterns by considering proximity to points of interest (POIs) and distances from specified locations.
+This Python tool calculates a "Local Mobility Index" (LMI) for given stop points, taking into account home and optional work locations. It is designed to assess the localness of mobility patterns by considering proximity to points of interest (POIs) and distances from specified locations.
 
 ## Features:
 - **Dynamic POI Downloading**: Automatically downloads POIs needed for computation.
