@@ -41,7 +41,7 @@ def LMI(stop_points, home_location, poiCutoff, nonPoiMaxDistance, second_place =
     if not all(is_numeric_or_none(value) for value in [poiCutoff, nonPoiMaxDistance, networkBufferAreaSize]):
         raise ValueError("poiCutoff, nonPoiMaxDistance, and networkBufferAreaSize must be numerical or None/default.")
 
-    # The analogy and some pre defined variables
+    # The analogy and some pre defined variables, tranforming the crs
     
     work_location = second_place
 
@@ -104,12 +104,6 @@ def LMI(stop_points, home_location, poiCutoff, nonPoiMaxDistance, second_place =
 
     gdf = stop_points.copy()
 
-    # Calculate the distance and filter out points more than 50 km away from home
-
-    lat, lon = home_location[1], home_location[0]
-
-    home_point = Point(lat, lon)
-
 
     # Compute the convex hull
     convex_hull = gdf.unary_union.convex_hull
@@ -163,8 +157,6 @@ def LMI(stop_points, home_location, poiCutoff, nonPoiMaxDistance, second_place =
     destination_gdf_projected = destination_gdf.to_crs(distance_crs)
 
     origin_gdf = stop_points.copy()
-
-    #to minimize the computational cost we first filter all those that are farther than 500 meters
 
     # Create network with pandana
     net = pdna.Network(nodes['x'], nodes['y'], edges['u'], edges['v'], edges[['length']])
@@ -239,7 +231,6 @@ def LMI(stop_points, home_location, poiCutoff, nonPoiMaxDistance, second_place =
 
     dist_home_dfs = []
 
-    # Assuming home_location is a tuple or list containing latitude and longitude coordinates
     lat, lon = home_location[1], home_location[0]
 
     point = Point(lat, lon)
@@ -309,7 +300,6 @@ def LMI(stop_points, home_location, poiCutoff, nonPoiMaxDistance, second_place =
     
         dist_home_dfs = []
     
-        # Assuming work_location is a tuple or list containing latitude and longitude coordinates
         lat, lon = work_location[1], work_location[0]
     
         point = Point(lat, lon)
@@ -378,10 +368,9 @@ def LMI(stop_points, home_location, poiCutoff, nonPoiMaxDistance, second_place =
     #computing the non-pois stop points distance to home locations
     all_nonPOI_points['distance_to_home'] = [np.nan]*len(all_nonPOI_points)
 
-    # Assuming home_location is a tuple or list containing latitude and longitude coordinates
+
     lat, lon = home_location[1], home_location[0]
 
-    # Check if the point is contained within the polygon
     point = Point(lat, lon)
 
     # Create a DataFrame with scalar values and provide an index
@@ -413,11 +402,9 @@ def LMI(stop_points, home_location, poiCutoff, nonPoiMaxDistance, second_place =
     if work_location != -1: 
         #computing the non-pois stop points distance to work locations
         all_nonPOI_points['distance_to_work'] = [np.nan]*len(all_nonPOI_points)
-    
-        # Assuming home_location is a tuple or list containing latitude and longitude coordinates
+
         lat, lon = work_location[1], work_location[0]
     
-        # Check if the point is contained within the polygon
         point = Point(lat, lon)
     
         # Create a DataFrame with scalar values and provide an index
@@ -449,9 +436,9 @@ def LMI(stop_points, home_location, poiCutoff, nonPoiMaxDistance, second_place =
     
     
     if work_location == -1:
-        #main function to compute the mobility localness of each user for poi points
+        #main section to compute the mobility localness
 
-        #just to have the same analogy for the rest of the code we stiil call it rank_
+        #just to have the same analogy for the rest of the code we still call it rank_
 
         all_nonPOI_points['rank_'] = 1-(all_nonPOI_points['distance_to_home']/nonPoiMaxDistance)
         all_nonPOI_points['rank_'] = all_nonPOI_points['rank_'].apply(lambda x: x if x > 0 else 0)
@@ -549,14 +536,14 @@ def LMI(stop_points, home_location, poiCutoff, nonPoiMaxDistance, second_place =
     else:
         
 
-        #main function to compute the mobility localness of each user for poi points work and home together
+        #main section to compute the mobility localness
 
         users_localness = []
         
         all_nonPOI_points['dist_to_both_min'] = np.minimum(all_nonPOI_points['distance_to_home'], all_nonPOI_points['distance_to_work'])
 
 
-        #just to have the same analogy for the rest of the code we stiil call it rank_
+        #just to have the same analogy for the rest of the code we still call it rank_
         all_nonPOI_points['rank_'] = 1-all_nonPOI_points['dist_to_both_min']/nonPoiMaxDistance
         all_nonPOI_points['rank_'] = all_nonPOI_points['rank_'] = all_nonPOI_points['rank_'].apply(lambda x: x if x > 0 else 0)
 
