@@ -1,4 +1,4 @@
-def LMI(stop_points, home_location, threshold_poi, max_dist_nonPOIstops, second_place = -1, filter_dist_from_home = None, buffer_size = None):
+def LMI(stop_points, home_location, poiCutoff, nonPoiMaxDistance, second_place = -1, networkBufferAreaSize = None):
     
     # importing packages
     
@@ -14,6 +14,7 @@ def LMI(stop_points, home_location, threshold_poi, max_dist_nonPOIstops, second_
     from geopy.distance import distance
     from scipy.spatial.distance import cdist
     import numbers
+    from pyproj import Transformer, CRS
     
     # Check if stop__points is a GeoDataFrame with known CRS
     if not isinstance(stop_points, gpd.GeoDataFrame) or stop_points.crs is None:
@@ -37,12 +38,32 @@ def LMI(stop_points, home_location, threshold_poi, max_dist_nonPOIstops, second_
         return value is None or isinstance(value, numbers.Number)
 
     # Check if the other parameters are numerical or their default values
-    if not all(is_numeric_or_none(value) for value in [threshold_poi, max_dist_nonPOIstops, filter_dist_from_home, buffer_size]):
-        raise ValueError("threshold_poi, max_dist_nonPOIstops, filter_dist_from_home, and buffer_size must be numerical or None/default.")
+    if not all(is_numeric_or_none(value) for value in [poiCutoff, nonPoiMaxDistance, networkBufferAreaSize]):
+        raise ValueError("poiCutoff, nonPoiMaxDistance, and networkBufferAreaSize must be numerical or None/default.")
 
     # The analogy and some pre defined variables
     
     work_location = second_place
+
+    # Function to get the UTM zone for a given latitude and longitude
+    def get_utm_zone(lon, lat):
+        utm_band = str(int((lon + 180) / 6) % 60 + 1)
+        if len(utm_band) == 1:
+            utm_band = '0' + utm_band
+        if lat >= 0:
+            return '326' + utm_band
+        else:
+            return '327' + utm_band
+
+    # Transform the GeoDataFrame to WGS 84
+    gdf_wgs84 = stop_points.to_crs(epsg=4326)
+
+    # Determine UTM zone for transformation
+    centroid = gdf_wgs84.geometry.unary_union.centroid
+    utm_crs = CRS.from_epsg(get_utm_zone(centroid.x, centroid.y))
+
+    # Transform to UTM CRS
+    stop_points = gdf_wgs84.to_crs(utm_crs)
     
     main_crs = stop_points.crs
     
@@ -59,17 +80,12 @@ def LMI(stop_points, home_location, threshold_poi, max_dist_nonPOIstops, second_
     home_point = Point(lat, lon)
 
 
-    gdf['distance'] = gdf['geometry'].distance(home_point)
-
-    if filter_dist_from_home != None:
-        gdf = gdf[gdf['distance'] <= filter_dist_from_home]
-
     # Compute the convex hull
     convex_hull = gdf.unary_union.convex_hull
 
-    if buffer_size != None:
+    if networkBufferAreaSize != None:
         # Add a 5km buffer
-        buffer_polygon = convex_hull.buffer(buffer_size)
+        buffer_polygon = convex_hull.buffer(networkBufferAreaSize)
 
         # Change the CRS of buffer back to EPSG:4326 for osmnx and make a geodataframe
         buffer = gpd.GeoDataFrame(geometry=[buffer_polygon], crs=main_crs).to_crs(epsg=4326)
@@ -105,7 +121,7 @@ def LMI(stop_points, home_location, threshold_poi, max_dist_nonPOIstops, second_
 
 
     #copmuting the distance between all pois and all stop points
-    threshold = threshold_poi  # Define the threshold distance
+    threshold = poiCutoff  # Define the threshold distance
 
 
     dist_dfs = []
@@ -406,7 +422,7 @@ def LMI(stop_points, home_location, threshold_poi, max_dist_nonPOIstops, second_
 
         #just to have the same analogy for the rest of the code we stiil call it rank_
 
-        all_nonPOI_points['rank_'] = 1-(all_nonPOI_points['distance_to_home']/max_dist_nonPOIstops)
+        all_nonPOI_points['rank_'] = 1-(all_nonPOI_points['distance_to_home']/nonPoiMaxDistance)
         all_nonPOI_points['rank_'] = all_nonPOI_points['rank_'].apply(lambda x: x if x > 0 else 0)
 
         # Create a dict for amenities and home for using as denominator
@@ -510,7 +526,7 @@ def LMI(stop_points, home_location, threshold_poi, max_dist_nonPOIstops, second_
 
 
         #just to have the same analogy for the rest of the code we stiil call it rank_
-        all_nonPOI_points['rank_'] = 1-all_nonPOI_points['dist_to_both_min']/max_dist_nonPOIstops
+        all_nonPOI_points['rank_'] = 1-all_nonPOI_points['dist_to_both_min']/nonPoiMaxDistance
         all_nonPOI_points['rank_'] = all_nonPOI_points['rank_'] = all_nonPOI_points['rank_'].apply(lambda x: x if x > 0 else 0)
 
 
@@ -525,8 +541,6 @@ def LMI(stop_points, home_location, threshold_poi, max_dist_nonPOIstops, second_
         results_df_home = dist_home_df
         try:
             origin_gdf = stop_points
-
-            print(origin_gdf)
             
             if len(origin_gdf)==1:
                 users_localness.append(1)
@@ -602,8 +616,7 @@ def LMI(stop_points, home_location, threshold_poi, max_dist_nonPOIstops, second_
     
                             except:
                                 pass
-    
-                            print(stop_point_dist_temp)
+
                             stop_point_dist_mean.append(stop_point_dist_temp)
     
                     poi_points_dwell_time = origin_gdf['t'][list_points_included]/origin_gdf['t'].sum()
