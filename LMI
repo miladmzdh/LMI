@@ -45,6 +45,8 @@ def LMI(stop_points, home_location, poiCutoff, nonPoiMaxDistance, second_place =
     
     work_location = second_place
 
+    main_crs_temp = stop_points.crs
+
     # Function to get the UTM zone for a given latitude and longitude
     def get_utm_zone(lon, lat):
         utm_band = str(int((lon + 180) / 6) % 60 + 1)
@@ -64,7 +66,36 @@ def LMI(stop_points, home_location, poiCutoff, nonPoiMaxDistance, second_place =
 
     # Transform to UTM CRS
     stop_points = gdf_wgs84.to_crs(utm_crs)
+
+    #transform home and work location to utm
     
+    lat, lon = home_location[1], home_location[0]
+    
+    point = Point(lat, lon)
+
+    # Create a GeoDataFrame with the point
+    home_location_gdf = gpd.GeoDataFrame(geometry=[point])
+
+    home_location_gdf.set_crs(main_crs_temp, inplace=True)
+
+    home_location_gdf = home_location_gdf.to_crs(utm_crs)
+
+    if work_location != -1: 
+    
+        lat, lon = work_location[1], work_location[0]
+    
+        point = Point(lat, lon)
+    
+        # Create a GeoDataFrame with the point
+        work_location_gdf = gpd.GeoDataFrame(geometry=[point])
+    
+        work_location_gdf.set_crs(main_crs_temp, inplace=True)
+
+        work_location_gdf = work_location_gdf.to_crs(utm_crs)
+
+    home_location = (home_location_gdf.geometry.iloc[0].x, home_location_gdf.geometry.iloc[0].y)
+    work_location = (work_location_gdf.geometry.iloc[0].x, work_location_gdf.geometry.iloc[0].y)
+
     main_crs = stop_points.crs
     
     user_id= 0
@@ -273,75 +304,75 @@ def LMI(stop_points, home_location, poiCutoff, nonPoiMaxDistance, second_place =
     # Create the DataFrame from the list of dictionaries
     dist_home_df = pd.DataFrame(results)
 
-
-    #computing the pois distance to work locations
-
-    dist_home_dfs = []
-
-    # Assuming home_location is a tuple or list containing latitude and longitude coordinates
-    lat, lon = work_location[1], work_location[0]
-
-    point = Point(lat, lon)
-
-    # Create a GeoDataFrame with the point
-    origin_gdf = gpd.GeoDataFrame(geometry=[point])
-
-    origin_gdf.set_crs(main_crs, inplace=True)
-
-    # Reshape the coordinate arrays
-    coords_origin = np.column_stack((origin_gdf.geometry.x, origin_gdf.geometry.y))
-    coords_destination = np.column_stack((destination_gdf_projected.geometry.x, destination_gdf_projected.geometry.y))
-
-    # Calculate distances using cdist()
-    distances = cdist(coords_origin, coords_destination)
-
-    # add the distances to the dataframe
-    destination_gdf['distance'] = distances[0]
-
-    # Group the DataFrame by amenity and find the index of the row with the minimum distance
-    closest_rows = destination_gdf.groupby('amenity')['distance'].idxmin()
-
-    # Get the closest rows
-    points_for_users_adjusted_temp = destination_gdf.loc[closest_rows]
-
-    points_for_users_adjusted = list(points_for_users_adjusted_temp.index)
-
-    origin_gdf.to_crs("EPSG:4326", inplace=True)
-
-    # Create a DataFrame with scalar values
-    df_temp = pd.DataFrame({'lat': [origin_gdf.geometry.y], 'lon': [origin_gdf.geometry.x]})
-
-    results = []
-
-    if len(points_for_users_adjusted) != 0:
-
-        # Get the node IDs using the DataFrame
-        origin_nodes = net.get_node_ids(df_temp['lat'], df_temp['lon']).values
-
-        # points that are closest
-        dests_nodes = net.get_node_ids(destination_gdf['geometry'].loc[points_for_users_adjusted].x, destination_gdf['geometry'].loc[points_for_users_adjusted].y).values
-
-        points_for_user = points_for_users[0]
-
-        if len(points_for_user)>0:
-            dests_nodes1 = net.get_node_ids(destination_gdf['geometry'].loc[points_for_user[1]].x, destination_gdf['geometry'].loc[points_for_user[1]].y).values
-            dests_nodes = np.concatenate((dests_nodes, dests_nodes1))
-            points_for_users_adjusted = points_for_users_adjusted + points_for_user[1]
-
-
-        for count, j in enumerate(dests_nodes):
-            # Get the nearest nodes in the graph for the origin and destination points
-            origin_node = origin_nodes[0]
-            destination_node = j
-
-            # Calculate the shortest path length using Pandana
-            path_length = net.shortest_path_length(origin_node, destination_node)
-
-            # Append the result as a dictionary to the list
-            results.append({'origin': user_id, 'destination': points_for_users_adjusted[count], 'length': path_length})
-
-    # Create the DataFrame from the list of dictionaries
-    dist_work_df = pd.DataFrame(results)
+    if work_location != -1: 
+        #computing the pois distance to work locations
+    
+        dist_home_dfs = []
+    
+        # Assuming work_location is a tuple or list containing latitude and longitude coordinates
+        lat, lon = work_location[1], work_location[0]
+    
+        point = Point(lat, lon)
+    
+        # Create a GeoDataFrame with the point
+        origin_gdf = gpd.GeoDataFrame(geometry=[point])
+    
+        origin_gdf.set_crs(main_crs, inplace=True)
+    
+        # Reshape the coordinate arrays
+        coords_origin = np.column_stack((origin_gdf.geometry.x, origin_gdf.geometry.y))
+        coords_destination = np.column_stack((destination_gdf_projected.geometry.x, destination_gdf_projected.geometry.y))
+    
+        # Calculate distances using cdist()
+        distances = cdist(coords_origin, coords_destination)
+    
+        # add the distances to the dataframe
+        destination_gdf['distance'] = distances[0]
+    
+        # Group the DataFrame by amenity and find the index of the row with the minimum distance
+        closest_rows = destination_gdf.groupby('amenity')['distance'].idxmin()
+    
+        # Get the closest rows
+        points_for_users_adjusted_temp = destination_gdf.loc[closest_rows]
+    
+        points_for_users_adjusted = list(points_for_users_adjusted_temp.index)
+    
+        origin_gdf.to_crs("EPSG:4326", inplace=True)
+    
+        # Create a DataFrame with scalar values
+        df_temp = pd.DataFrame({'lat': [origin_gdf.geometry.y], 'lon': [origin_gdf.geometry.x]})
+    
+        results = []
+    
+        if len(points_for_users_adjusted) != 0:
+    
+            # Get the node IDs using the DataFrame
+            origin_nodes = net.get_node_ids(df_temp['lat'], df_temp['lon']).values
+    
+            # points that are closest
+            dests_nodes = net.get_node_ids(destination_gdf['geometry'].loc[points_for_users_adjusted].x, destination_gdf['geometry'].loc[points_for_users_adjusted].y).values
+    
+            points_for_user = points_for_users[0]
+    
+            if len(points_for_user)>0:
+                dests_nodes1 = net.get_node_ids(destination_gdf['geometry'].loc[points_for_user[1]].x, destination_gdf['geometry'].loc[points_for_user[1]].y).values
+                dests_nodes = np.concatenate((dests_nodes, dests_nodes1))
+                points_for_users_adjusted = points_for_users_adjusted + points_for_user[1]
+    
+    
+            for count, j in enumerate(dests_nodes):
+                # Get the nearest nodes in the graph for the origin and destination points
+                origin_node = origin_nodes[0]
+                destination_node = j
+    
+                # Calculate the shortest path length using Pandana
+                path_length = net.shortest_path_length(origin_node, destination_node)
+    
+                # Append the result as a dictionary to the list
+                results.append({'origin': user_id, 'destination': points_for_users_adjusted[count], 'length': path_length})
+    
+        # Create the DataFrame from the list of dictionaries
+        dist_work_df = pd.DataFrame(results)
 
 
     #computing the non-pois stop points distance to home locations
@@ -379,41 +410,41 @@ def LMI(stop_points, home_location, poiCutoff, nonPoiMaxDistance, second_place =
 
         all_nonPOI_points.distance_to_home[list(temp_dest_gdf.index)] = results
 
-
-    #computing the non-pois stop points distance to work locations
-    all_nonPOI_points['distance_to_work'] = [np.nan]*len(all_nonPOI_points)
-
-    # Assuming home_location is a tuple or list containing latitude and longitude coordinates
-    lat, lon = work_location[1], work_location[0]
-
-    # Check if the point is contained within the polygon
-    point = Point(lat, lon)
-
-    # Create a DataFrame with scalar values and provide an index
-    df_temp = pd.DataFrame({'lat': [lat], 'lon': [lon]})
-
-    # Get the node IDs using the DataFrame
-    origin_nodes = net.get_node_ids(df_temp['lat'], df_temp['lon']).values
-
-    temp_dest_gdf = all_nonPOI_points
-
-    results = []
-    if len(temp_dest_gdf) != 0:
-
-        dests_nodes = net.get_node_ids(temp_dest_gdf['geometry'].x, temp_dest_gdf['geometry'].y).values
-
-        for count, j in enumerate(dests_nodes):
-            # Get the nearest nodes in the graph for the origin and destination points
-            origin_node = origin_nodes[0]
-            destination_node = j
-
-            # Calculate the shortest path length using Pandana
-            path_length = net.shortest_path_length(origin_node, destination_node)
-
-            # Append the result as a dictionary to the list
-            results.append(path_length)
-
-        all_nonPOI_points.distance_to_work[list(temp_dest_gdf.index)] = results
+    if work_location != -1: 
+        #computing the non-pois stop points distance to work locations
+        all_nonPOI_points['distance_to_work'] = [np.nan]*len(all_nonPOI_points)
+    
+        # Assuming home_location is a tuple or list containing latitude and longitude coordinates
+        lat, lon = work_location[1], work_location[0]
+    
+        # Check if the point is contained within the polygon
+        point = Point(lat, lon)
+    
+        # Create a DataFrame with scalar values and provide an index
+        df_temp = pd.DataFrame({'lat': [lat], 'lon': [lon]})
+    
+        # Get the node IDs using the DataFrame
+        origin_nodes = net.get_node_ids(df_temp['lat'], df_temp['lon']).values
+    
+        temp_dest_gdf = all_nonPOI_points
+    
+        results = []
+        if len(temp_dest_gdf) != 0:
+    
+            dests_nodes = net.get_node_ids(temp_dest_gdf['geometry'].x, temp_dest_gdf['geometry'].y).values
+    
+            for count, j in enumerate(dests_nodes):
+                # Get the nearest nodes in the graph for the origin and destination points
+                origin_node = origin_nodes[0]
+                destination_node = j
+    
+                # Calculate the shortest path length using Pandana
+                path_length = net.shortest_path_length(origin_node, destination_node)
+    
+                # Append the result as a dictionary to the list
+                results.append(path_length)
+    
+            all_nonPOI_points.distance_to_work[list(temp_dest_gdf.index)] = results
 
     
     
