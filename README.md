@@ -15,6 +15,8 @@ This Python tool calculates a "Local Mobility Index" (LMI) for given stop points
   - `nonPoiMaxDistance`: The maximum distance (in meters) for non-POI stops. This parameter sets the maximum influence of stops that are not points of interest in the localness score.
   - `second_place`: Optional. A tuple (X, Y) of the user's work location in the same Coordinate Reference System as the stop_points, or -1 if not applicable. This parameter allows for bi-centric analysis of mobility patterns.
   - `networkBufferAreaSize`: Optional. Buffer size (in meters) for the area of interest around stop points for network data download. Determines the spatial extent for downloading network and POI data.
+  - `POITypeList`: Optional. A list of strings specifying types of amenities to filter from OpenStreetMap data. If None, all POI types are considered.
+  - `pois`: Optional. A GeoDataFrame provided by the user containing custom POIs. Must contain geometry and amenity columns.
 
 ## Usage:
 1. **Input Preparation**: Prepare a GeoDataFrame of stop points.
