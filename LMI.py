@@ -1,4 +1,4 @@
-def LMI(stop_points, home_location, poiCutoff, nonPoiMaxDistance, second_place = -1, networkBufferAreaSize = None):
+def LMI(stop_points, home_location, poiCutoff, nonPoiMaxDistance, second_place = -1, networkBufferAreaSize = None, POITypeList = None, pois = None):
     
     # importing packages
     
@@ -40,6 +40,18 @@ def LMI(stop_points, home_location, poiCutoff, nonPoiMaxDistance, second_place =
     # Check if the other parameters are numerical or their default values
     if not all(is_numeric_or_none(value) for value in [poiCutoff, nonPoiMaxDistance, networkBufferAreaSize]):
         raise ValueError("poiCutoff, nonPoiMaxDistance, and networkBufferAreaSize must be numerical or None/default.")
+
+    # Check if POITypeList is a list containing only string values
+    if POITypeList is not None:
+        if not isinstance(POITypeList, list) or not all(isinstance(item, str) for item in POITypeList):
+            raise ValueError("POITypeList must be a list of strings")
+
+    # Check if pois is a GeoDataFrame and contains the required columns
+    if pois is not None:
+        if not isinstance(pois, gpd.GeoDataFrame):
+            raise TypeError("pois must be a GeoDataFrame")
+        if 'geometry' not in pois.columns or 'amenity' not in pois.columns:
+            raise ValueError("pois must contain 'geometry' and 'amenity' columns")
 
     # The analogy and some pre defined variables, tranforming the crs
     
@@ -128,18 +140,22 @@ def LMI(stop_points, home_location, poiCutoff, nonPoiMaxDistance, second_place =
     edges = edges.reset_index()
     
     
-
-    # Specify the desired tags for amenities
-    tags = {'amenity': True}
-
-    # Download amenities within the polygon using OSMnx
-    geometries = ox.geometries.geometries_from_polygon(buffer.geometry[0], tags=tags)
-
-    # Convert the geometries to a GeoDataFrame
-    pois = gpd.GeoDataFrame(geometries)
-
-    # Filter the DataFrame to keep only the nodes
-    pois = pois[pois.index.get_level_values('element_type') == 'node']
+    if pois is None:
+        # Specify the desired tags for amenities
+        tags = {'amenity': True}
+    
+        # Download amenities within the polygon using OSMnx
+        geometries = ox.geometries.geometries_from_polygon(buffer.geometry[0], tags=tags)
+    
+        # Convert the geometries to a GeoDataFrame
+        pois = gpd.GeoDataFrame(geometries)
+    
+        # Filter the DataFrame to keep only the nodes
+        pois = pois[pois.index.get_level_values('element_type') == 'node']
+        
+        # Filter based on the user's list
+        if POITypeList is not None:
+            pois = pois[pois['amenity'].isin(POITypeList)]
 
     # Reset the index of the filtered DataFrame
     destination_gdf = pois.reset_index()
